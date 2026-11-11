@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroManager - Sistema de Gestão Agricola</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>🌾 AgroManager - Painel de Monitoramento</h1>
+    </header>
+
+    <div class="container">
+        <!-- Coluna da Esquerda: Formulários -->
+        <aside>
+            <section class="card">
+                <h2>Cadastrar Maquinário</h2>
+                <form id="form-maquinario">
+                    <div class="form-group">
+                        <label for="modelo">Modelo do Maquinário</label>
+                        <input type="text" id="modelo" placeholder="Ex: John Deere 6135M" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tipo">Tipo de Maquinário</label>
+                        <select id="tipo" required>
+                            <option value="">Selecione...</option>
+                            <option value="Trator">Trator</option>
+                            <option value="Colheitadeira">Colheitadeira</option>
+                            <option value="Pulverizador">Pulverizador</option>
+                            <option value="Semeadora">Semeadora</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="horasUso">Horas de Uso acumuladas</label>
+                        <input type="number" id="horasUso" placeholder="Ex: 1200" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="proximaManutencao">Data da Próxima Manutenção</label>
+                        <input type="date" id="proximaManutencao" required>
+                    </div>
+
+                    <button type="submit">Cadastrar Maquinário</button>
+                </form>
+            </section>
+
+            <section class="card">
+                <h2>Registrar Ciclo de Plantio</h2>
+                <form id="form-plantio">
+                    <div class="form-group">
+                        <label for="cultura">Cultura (Plantação)</label>
+                        <input type="text" id="cultura" placeholder="Ex: Milho, Soja, Trigo" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dataPlantio">Data do Plantio</label>
+                        <input type="date" id="dataPlantio" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="previsaoColheita">Previsão da Colheita</label>
+                        <input type="date" id="previsaoColheita" required>
+                    </div>
+
+                    <button type="submit">Registrar Plantio</button>
+                </form>
+            </section>
+        </aside>
+
+        <!-- Coluna da Direita: Tabelas e Monitoramento -->
+        <main>
+            <section class="card">
+                <h2>Frota Registrada e Manutenção</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Modelo</th>
+                            <th>Tipo</th>
+                            <th>Horas</th>
+                            <th>Manutenção</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-maquinarios">
+                        <!-- Conteúdo dinâmico via JS -->
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="card">
+                <h2>Monitoramento de Ciclos Agrícolas</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cultura</th>
+                            <th>Data Plantio</th>
+                            <th>Previsão Colheita</th>
+                            <th>Tempo Restante</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-plantios">
+                        <!-- Conteúdo dinâmico via JS -->
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API_MAQUINARIOS = 'http://localhost:8080/api/maquinarios';
+        const API_PLANTIOS = 'http://localhost:8080/api/plantios';
+
+        // Event listener do formulário de Maquinário
+        document.getElementById('form-maquinario').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const maquinario = {
+                modelo: document.getElementById('modelo').value,
+                tipo: document.getElementById('tipo').value,
+                horasUso: parseInt(document.getElementById('horasUso').value),
+                proximaManutencao: document.getElementById('proximaManutencao').value
+            };
+
+            try {
+                await fetch(API_MAQUINARIOS, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(maquinario)
+                });
+                document.getElementById('form-maquinario').reset();
+                carregarMaquinarios();
+            } catch (err) {
+                console.error("Erro ao conectar com o backend:", err);
+            }
+        });
+
+        // Event listener do formulário de Plantio
+        document.getElementById('form-plantio').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const plantio = {
+                cultura: document.getElementById('cultura').value,
+                dataPlantio: document.getElementById('dataPlantio').value,
+                previsaoColheita: document.getElementById('previsaoColheita').value
+            };
+
+            try {
+                await fetch(API_PLANTIOS, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(plantio)
+                });
+                document.getElementById('form-plantio').reset();
+                carregarPlantios();
+            } catch (err) {
+                console.error("Erro ao conectar com o backend:", err);
+            }
+        });
+
+        // Carregar a lista de Maquinários
+        async function carregarMaquinarios() {
+            try {
+                const res = await fetch(API_MAQUINARIOS);
+                const dados = await res.json();
+                const tbody = document.getElementById('tabela-maquinarios');
+                tbody.innerHTML = '';
+
+                dados.forEach(m => {
+                    const statusClass = m.alertaManutencao ? 'status-alerta' : 'status-ok';
+                    const statusText = m.alertaManutencao ? 'Manutenção Pendente' : 'Em Dia';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${m.modelo}</strong></td>
+                            <td>${m.tipo}</td>
+                            <td>${m.horasUso}h</td>
+                            <td>${formatarData(m.proximaManutencao)}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.warn("Backend não conectado ainda.");
+            }
+        }
+
+        // Carregar a lista de Plantios
+        async function carregarPlantios() {
+            try {
+                const res = await fetch(API_PLANTIOS);
+                const dados = await res.json();
+                const tbody = document.getElementById('tabela-plantios');
+                tbody.innerHTML = '';
+
+                dados.forEach(p => {
+                    const diasRestantes = calcularDiasRestantes(p.previsaoColheita);
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${p.cultura}</strong></td>
+                            <td>${formatarData(p.dataPlantio)}</td>
+                            <td>${formatarData(p.previsaoColheita)}</td>
+                            <td>${diasRestantes} dias</td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.warn("Backend não conectado ainda.");
+            }
+        }
+
+        function formatarData(dataIso) {
+            if (!dataIso) return '-';
+            const [ano, mes, dia] = dataIso.split('-');
+            return `${dia}/${mes}/${ano}`;
+        }
+
+        function calcularDiasRestantes(dataFuturaIso) {
+            const hoje = new Date();
+            const futura = new Date(dataFuturaIso);
+            const diffTime = futura - hoje;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays > 0 ? diffDays : 0;
+        }
+
+        // Inicialização
+        carregarMaquinarios();
+        carregarPlantios();
+    </script>
+</body>
+</html>
